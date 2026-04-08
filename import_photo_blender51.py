@@ -116,7 +116,11 @@ def load_photo_for_pnpoint(
 
     # --- Seed camera intrinsics into the clip's tracking camera -------------
     tc = clip.tracking.camera          # bpy.types.MovieTrackingCamera
-    tc.lens         = float(focal_mm)
+    # focal_length (Blender 4.0+) replaced the old `lens` attribute
+    if hasattr(tc, 'focal_length'):
+        tc.focal_length = float(focal_mm)
+    else:
+        tc.lens = float(focal_mm)       # Blender 3.x fallback
     tc.sensor_width = float(sensor_mm)
 
     w, h = clip.size[:]
@@ -124,13 +128,17 @@ def load_photo_for_pnpoint(
         if hasattr(tc, 'principal_point_pixels'):
             # Blender 4.0+: stored in pixels
             tc.principal_point_pixels = (w / 2.0, h / 2.0)
+        elif hasattr(tc, 'principal_point'):
+            # Blender 4.x normalised fallback
+            tc.principal_point = (0.5, 0.5)
         elif hasattr(tc, 'principal'):
-            # Blender 3.x: stored as 0..1 normalised
+            # Blender 3.x
             tc.principal = (0.5, 0.5)
 
+    focal_set = tc.focal_length if hasattr(tc, 'focal_length') else getattr(tc, 'lens', focal_mm)
     print(
         f"[camera-pnpoint helper] clip='{clip.name}' {w}x{h}px  "
-        f"focal={focal_mm}mm  sensor={sensor_mm}mm  "
+        f"focal={focal_set}mm  sensor={tc.sensor_width}mm  "
         f"clip_editor={'opened' if clip_area else 'not found'}"
     )
     return {
